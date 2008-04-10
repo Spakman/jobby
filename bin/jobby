@@ -1,0 +1,30 @@
+#!/usr/bin/env ruby
+require "socket"
+require "fileutils"
+
+# socket probably wants to live in shared directory
+@socket = "/tmp/jobby"
+begin
+  client = UNIXSocket.open(@socket)
+rescue Exception => e
+  puts "Creating server instance"
+  FileUtils.rm(@socket, :force => true) if File.exists? @socket
+  fork do
+    socket = UNIXServer.open(@socket)
+    FileUtils.chmod 0770, @socket
+    socket.listen 10
+    loop do
+      client = socket.accept
+      message_struct = client.recvfrom(1024)
+      pid = fork do
+#       require 'program that know how to handle a message'
+        puts "run this job: #{message_struct.first}"
+      end
+      Process.detach pid
+    end
+  end
+  client = UNIXSocket.open(@socket)
+ensure
+  client.send(ARGV.first || "", 0)
+  client.close
+end
