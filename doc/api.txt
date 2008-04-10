@@ -29,7 +29,7 @@ Jobby Table:
 id                  INTEGER
 job_kind            STRING
 args                BLOB
-status              [ 'QUEUED' , 'RUNNING', 'DONE', 'ERROR' ] 
+status              [ 'NEW', 'QUEUED' , 'RUNNING', 'DONE', 'ERROR' ] 
 priority            INTEGER
 progress_message    STRING
 created_at          DATETIME
