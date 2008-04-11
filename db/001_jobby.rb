@@ -9,6 +9,7 @@ class Jobby < ActiveRecord::Migration
       t.column :created_at, :datetime, :null => false
       t.column :started_at, :datetime, :null => true
       t.column :time_to_live, :integer, :null => false
+      t.column :version, :integer, :null => false
     end
   end
 

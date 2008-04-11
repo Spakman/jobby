@@ -1,30 +1,22 @@
 #!/usr/bin/env ruby
-require "socket"
-require "fileutils"
+require "#{File.dirname(__FILE__)}/../lib/server"
+require "#{File.dirname(__FILE__)}/../lib/client"
 
 # socket probably wants to live in shared directory
 @socket = "/tmp/jobby"
+@max_child_processes = 3
 begin
-  client = UNIXSocket.open(@socket)
-rescue Exception => e
-  puts "Creating server instance"
-  FileUtils.rm(@socket, :force => true) if File.exists? @socket
+  # Try to connect to the server process
+  Jobby::Client.new(@socket) { |client| client.send("begin") }
+rescue Errno::ECONNREFUSED
+  # Connect failed, fork and start the server process
   fork do
-    socket = UNIXServer.open(@socket)
-    FileUtils.chmod 0770, @socket
-    socket.listen 10
-    loop do
-      client = socket.accept
-      message_struct = client.recvfrom(1024)
-      pid = fork do
-#       require 'program that know how to handle a message'
-        puts "run this job: #{message_struct.first}"
-      end
-      Process.detach pid
-    end
+    Jobby::Server.new(@socket, @max_child_processes).run
   end
-  client = UNIXSocket.open(@socket)
+  Jobby::Client.new(@socket) { |client| client.send("rescue") }
 ensure
-  client.send(ARGV.first || "", 0)
-  client.close
+  # test code
+  10.times do |count|
+    Jobby::Client.new(@socket) { |client| client.send("#{count}") }
+  end
 end
