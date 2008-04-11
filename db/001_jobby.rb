@@ -2,6 +2,7 @@ class Jobby < ActiveRecord::Migration
   def self.up
     create_table :jobs do |t|
       t.column :freelancer, :string, :null => true
+      t.column :path_to_freelancers, :string, :null => false
       t.column :args, :binary
       t.column :status, :string, :null => false, :default => "NEW"
       t.column :priority, :integer, :null => false, :default => 1

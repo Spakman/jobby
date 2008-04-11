@@ -2,8 +2,10 @@ require 'activerecord'
 
 module Jobby
   class Job < ActiveRecord::Base
-    def self.add(freelancer, time_to_live, priority, *args)
+    def self.add(freelancer, path_to_freelancers, time_to_live, priority, *args)
       job = self.new
+      job.path_to_freelancers = File.expand_path(path_to_freelancers)
+      job.freelancer = freelancer.to_s
       job.time_to_live = time_to_live
       job.args = args
       job.status = "NEW"

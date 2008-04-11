@@ -13,7 +13,8 @@ describe Jobby::Job do
       :adapter => "sqlite3"
     )
     Jobby::Job.delete_all
-    @job = Jobby::Job.add(:test_freelancer, 60, 5, { :cheese => :good })
+    @freelancers_dir = "#{File.dirname(__FILE__)}/../lib/freelancers"
+    @job = Jobby::Job.add(:test, @freelancers_dir, 60, 5, { :cheese => :good })
     @freelancer = TestFreelancer.new(@job)
   end
 
