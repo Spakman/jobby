@@ -1,7 +1,7 @@
 require "#{File.dirname(__FILE__)}/../lib/job"
 module Jobby
   class Dispatcher
-    def dispatch_job
+    def self.dispatch_job
       job = Jobby::Job.next
       require "#{job.path_to_freelancers}/#{job.freelancer}_freelancer"
       freelancer_class = job.freelancer+"_freelancer"

@@ -1,4 +1,5 @@
-require "socket"
+require 'socket'
+
 module Jobby
   class Client
     def initialize(socket_path, &block)

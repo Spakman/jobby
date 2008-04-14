@@ -1,17 +1,19 @@
 #!/usr/bin/env ruby
+require 'logger'
 require "#{File.dirname(__FILE__)}/../lib/server"
 require "#{File.dirname(__FILE__)}/../lib/client"
 
 # socket probably wants to live in shared directory
 @socket = "/tmp/jobby"
+@logfile = "/tmp/jobby_log"
 @max_child_processes = 3
 begin
   # Try to connect to the server process
   Jobby::Client.new(@socket) { |client| client.send("begin") }
-rescue Errno::ECONNREFUSED
+rescue
   # Connect failed, fork and start the server process
   fork do
-    Jobby::Server.new(@socket, @max_child_processes).run
+    Jobby::Server.new(@socket, @max_child_processes, @logfile).run
   end
   Jobby::Client.new(@socket) { |client| client.send("rescue") }
 ensure
