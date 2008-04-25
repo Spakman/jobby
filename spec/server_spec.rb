@@ -21,6 +21,7 @@ describe Jobby::Server do
     if File.exists? @child_filepath
       FileUtils.rm @child_filepath
     end
+    sleep 0.5
   end
 
   before :all do
@@ -49,6 +50,10 @@ describe Jobby::Server do
 
   it "should listen on a UNIX socket" do
     lambda { UNIXSocket.open(@socket).close }.should_not raise_error
+  end
+
+  it "should throw an exception if there is already a process listening on the socket" do
+    lambda { Jobby::Server.new(@socket, @max_child_processes, @log_filepath).run { true } }.should raise_error(Errno::EADDRINUSE, "Address already in use - it seems like there is already a server listening on #{@socket}")
   end
 
   it "should set the correct permissions on the socket file" do

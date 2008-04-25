@@ -3,23 +3,39 @@ require 'socket'
 require 'logger'
 
 module Jobby
+  # This is a generic server class which accepts connections on a UNIX socket. On
+  # receiving a connection, the server process forks and runs the specified block.
+  #
+  # ==Example
+  #
+  #   Jobby::Server.new("/tmp/jobby.socket", 3, "/var/log/jobby.log").run do
+  #     # This code will be run in the forked children
+  #     puts "#{Process.pid}: I'm toilet trained!"
+  #   end
+  #
+  # ==Log rotation
+  #
+  # The server can receive USR1 signals as notification that the logfile has been 
+  # rotated. This will close and re-open the handle to the log file. Since the
+  # server process forks to produce children, they too can handle USR1 signals on
+  # log rotation.
+  #
+  # To tell all Jobby processes that the log file has been rotated, use something 
+  # like:
+  # 
+  #   % pkill -USR1 -f jobby
+  #
   class Server
     def initialize(socket_path, max_forked_processes, log_path)
-      FileUtils.rm(socket_path, :force => true)
-      @socket = UNIXServer.open(socket_path)
-      FileUtils.chmod 0770, socket_path
-      @socket.listen 10
-      @pids = []
+      @socket_path = socket_path
       @max_forked_processes = max_forked_processes.to_i
       @log_path = log_path
-      @logger = Logger.new log_path
-      @logger.info "Server started at #{Time.now}"
-      Signal.trap("USR1") do
-        rotate_log
-      end
+      @pids = []
     end
 
+    # Starts the server and listens for connections. The specified block is run in the child processes.
     def run(&block)
+      connect_to_socket_and_start_logging
       loop do
         client = @socket.accept
         message_struct = client.recvfrom(1024)
@@ -29,7 +45,7 @@ module Jobby
           rescue Errno::ECHILD
           end
         end
-        # Fork and run code that performs the actual work
+        # fork and run code that performs the actual work
         @pids << fork do
           block.call
         end
@@ -38,6 +54,41 @@ module Jobby
     end
     
     protected
+
+    # Checks if a process is already listening on the socket. If not, removes the 
+    # socket file (if it's there) and starts a server. Throws an Errno::EADDRINUSE
+    # exception if an existing server is detected.
+    def connect_to_socket_and_start_logging
+      unless File.exists? @socket_path
+        connect_to_socket
+      else
+        begin
+          # test for a server on the socket
+          test_socket = UNIXSocket.open(@socket_path)
+          test_socket.close # got this far - seems like there is a server already
+          raise Errno::EADDRINUSE.new("it seems like there is already a server listening on #{@socket_path}")
+        rescue Errno::ECONNREFUSED
+          # probably not a server on that socket - start one
+          FileUtils.rm(@socket_path, :force => true)
+          connect_to_socket
+        end
+      end
+    end
+
+    def connect_to_socket
+      @socket = UNIXServer.open(@socket_path)
+      FileUtils.chmod 0770, @socket_path
+      @socket.listen 10
+      start_logging
+    end
+
+    def start_logging
+      @logger = Logger.new @log_path
+      @logger.info "Server started at #{Time.now}"
+      Signal.trap("USR1") do
+        rotate_log
+      end
+    end
 
     def reap_child
       Thread.new do
