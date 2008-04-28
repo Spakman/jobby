@@ -36,7 +36,6 @@ describe Jobby::Server do
       File.open(@child_filepath, "a+") do |file|
         file << "#{Process.pid}"
       end
-      exit 0 # this makes sure the child process is terminated before carrying on and running specs (since it is forked)
     }
   end
 
@@ -61,6 +60,7 @@ describe Jobby::Server do
   end
 
   it "should set the correct ownership on the socket file"
+  it "should set the correct ownership of the server and children processes"
 
   it "should log when it is started" do
     File.read(@log_filepath).should match(/Server started at/)
@@ -77,27 +77,28 @@ describe Jobby::Server do
     socket = UNIXSocket.open(@socket)
     socket.send("hiya", 0)
     sleep 0.2
-    File.read(@child_filepath).should eql((@server_pid.to_i + 1).to_s)
+    File.read(@child_filepath).should_not eql(@server_pid.to_s)
   end
 
-  it "should only fork off a certain number of children - the others should have to wait" do
+  it "should actually not make the children wait(!), but queue their requests internally"
+
+  it "should only fork off a certain number of children - the others should have to wait (in an internal queue)" do
     terminate_server
     run_server(@socket, @max_child_processes, @log_filepath) do
+      sleep 2
       File.open(@child_filepath, "a+") do |file|
         file << "#{Process.pid}\n"
       end
-      sleep 2
-      exit 0 # this makes sure the child process is terminated before carrying on and running specs (since it is forked)
     end
-    (@max_child_processes + 1).times do |i|
+    (@max_child_processes + 2).times do |i|
       Thread.new do
         socket = UNIXSocket.open(@socket)
         socket.send("hiya", 0)
       end
     end
-    sleep 0.5
+    sleep 2.5
     File.readlines(@child_filepath).length.should eql(@max_child_processes)
-    sleep 2
-    File.readlines(@child_filepath).length.should eql(@max_child_processes + 1)
+    sleep 4
+    File.readlines(@child_filepath).length.should eql(@max_child_processes + 2)
   end
 end

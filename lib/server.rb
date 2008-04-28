@@ -33,23 +33,27 @@ module Jobby
       @pids = []
     end
 
-    # Starts the server and listens for connections. The specified block is run in the child processes.
+    # Starts the server and listens for connections. The specified block is run in the child processes. The message variable that is passed to the block is the message that is received from Client#send.
     def run(&block)
       connect_to_socket_and_start_logging
       loop do
         client = @socket.accept
-        message_struct = client.recvfrom(1024)
-        if @pids.length >= @max_forked_processes
-          begin
-            @pids.delete Process.wait
-          rescue Errno::ECHILD
+        message = client.recvfrom(1024).first
+        # start a new thread to handle the client so we can return quickly
+        Thread.new do
+          if @pids.length >= @max_forked_processes
+            begin
+              reap_child
+            rescue Errno::ECHILD
+            end
           end
+          # fork and run code that performs the actual work
+          @pids << fork do
+            block.call(message)
+            exit 0
+          end
+          reap_child
         end
-        # fork and run code that performs the actual work
-        @pids << fork do
-          block.call
-        end
-        reap_child
       end
     end
     
@@ -91,9 +95,7 @@ module Jobby
     end
 
     def reap_child
-      Thread.new do
-        @pids.delete Process.wait
-      end
+      @pids.delete Process.wait
     end
 
     def rotate_log
