@@ -26,10 +26,10 @@ module Jobby
   #   % pkill -USR1 -f jobby
   #
   class Server
-    def initialize(socket_path, max_forked_processes, log_path)
+    def initialize(socket_path, max_forked_processes, log)
       @socket_path = socket_path
       @max_forked_processes = max_forked_processes.to_i
-      @log_path = log_path
+      @log = log
       @pids = []
     end
 
@@ -38,7 +38,7 @@ module Jobby
       connect_to_socket_and_start_logging
       loop do
         client = @socket.accept
-        message = client.recvfrom(1024).first
+        input = client.recvfrom(1024).first
         # start a new thread to handle the client so we can return quickly
         Thread.new do
           if @pids.length >= @max_forked_processes
@@ -49,7 +49,7 @@ module Jobby
           end
           # fork and run code that performs the actual work
           @pids << fork do
-            block.call(message)
+            block.call(input)
             exit 0
           end
           reap_child
@@ -87,7 +87,7 @@ module Jobby
     end
 
     def start_logging
-      @logger = Logger.new @log_path
+      @logger = Logger.new @log
       @logger.info "Server started at #{Time.now}"
       Signal.trap("USR1") do
         rotate_log
@@ -100,7 +100,7 @@ module Jobby
 
     def rotate_log
       @logger.close
-      @logger = Logger.new @log_path
+      @logger = Logger.new @log
       @logger.info "USR1 received, rotating log file"
     end
   end

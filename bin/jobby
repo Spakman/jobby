@@ -1,24 +1,118 @@
 #!/usr/bin/env ruby
 require 'logger'
+require 'optparse'
 require "#{File.dirname(__FILE__)}/../lib/server"
 require "#{File.dirname(__FILE__)}/../lib/client"
 
-# socket probably wants to live in shared directory
-@socket = "/tmp/jobby"
-@logfile = "/tmp/jobby_log"
-@max_child_processes = 3
+options = {}
+OptionParser.new do |opts|
+  opts.banner = "Usage: jobby [options]"
+
+  opts.on("-v", "--[no-]verbose", "Run verbosely") do |verbose|
+    options[:verbose] = verbose
+  end
+
+  opts.on("-h", "--help", "Show this message") do
+    puts opts
+    exit
+  end
+
+  opts.on("--version", "Show version") do
+    puts "brand spanking!"
+    exit
+  end
+
+  opts.on("-s", "--socket [SOCKETFILE]", "Connect to this UNIX socket") do |socket|
+    options[:socket] = socket
+  end
+
+  opts.on("-i", "--input [INPUT]", "Pass this string to the child process (can be used instead of STDIN)") do |input|
+    options[:input] = input
+  end
+
+  opts.on("-f", "--flush", "Shutdown the server on the specified socket") do |flush|
+    options[:flush] = flush
+    puts "not implemented"
+    exit
+  end
+
+  opts.separator ""
+  opts.separator "Server options:"
+
+  opts.on("-l", "--log [LOGFILE]", "Log to this file") do |logfile|
+    options[:log] = logfile
+  end
+
+  opts.on("-m", "--max-children [MAXCHILDREN]", "Run MAXCHILDREN forked processes at any one time") do |forked_children|
+    options[:max_child_processes] = forked_children.to_i
+  end
+
+  opts.on("-u", "--user [USER]", "Run the processes as this user (probably requires superuser priviledges)") do |user|
+    options[:user] = user
+    puts "not implemented"
+    exit
+  end
+
+  opts.on("-g", "--group [GROUP]", "Run the processes as this group") do |group|
+    options[:group] = group
+    puts "not implemented"
+    exit
+  end
+
+  opts.on("-r", "--ruby [RUBY]", "Run this Ruby code in the forked children") do |ruby|
+    options[:ruby] = lambda { |parameter| 
+      eval(ruby)
+    }
+  end
+
+  opts.on("-c", "--command [COMMAND]", "Run this shell code in the forked children") do |command|
+    options[:command] = lambda { |parameter| 
+      if parameter.empty?
+        exec("#{command.gsub('"', '\"')}")
+      else
+        exec("#{command.gsub('"', '\"')}", parameter )
+      end
+    }
+  end
+end.parse!
+
+default_options = {}
+default_options[:socket] = "/tmp/jobby.socket"
+if options[:input].nil?
+  default_options[:input] = $stdin.read
+end
+default_options[:log] = $stderr
+default_options[:max_child_processes] = 1
+options = default_options.merge options
+
+if not options[:ruby].nil? and not options[:command].nil?
+  puts "You can only specify --ruby or --command, not both"
+  exit
+end
+
 begin
   # Try to connect to the server process
-  Jobby::Client.new(@socket) { |client| client.send("begin") }
+  Jobby::Client.new(options[:socket]) { |client| client.send(options[:input]) }
 rescue
   # Connect failed, fork and start the server process
+  if options[:ruby].nil? and options[:command].nil?
+    puts "No server found on #{options[:socket]} and you didn't give --ruby or --comand to execute"
+    exit
+  end
   fork do
-    Jobby::Server.new(@socket, @max_child_processes, @logfile).run
+    Jobby::Server.new(options[:socket], options[:max_child_processes], options[:log]).run(&options[:block_to_run])
   end
-  Jobby::Client.new(@socket) { |client| client.send("rescue") }
+  Jobby::Client.new(options[:socket]) { |client| client.send(options[:input]) }
 ensure
-  # test code
-  10.times do |count|
-    Jobby::Client.new(@socket) { |client| client.send("#{count}") }
-  end
+# ts = []
+# 2.times do
+#   ts << Thread.new do
+#     100.times do |i|
+#       Jobby::Client.new(@socket) { |client| client.send(i.to_s) }
+#     end
+#   end
+# end
+# ts.each do |t|
+#   t.join
+# end
 end

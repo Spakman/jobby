@@ -17,7 +17,6 @@ describe Jobby::Server do
 
   def terminate_server
     Process.kill 15, @server_pid
-    FileUtils.rm @log_filepath
     if File.exists? @child_filepath
       FileUtils.rm @child_filepath
     end
@@ -64,6 +63,19 @@ describe Jobby::Server do
 
   it "should log when it is started" do
     File.read(@log_filepath).should match(/Server started at/)
+  end
+
+  it "should be able to accept an IO object instead of a log filepath" do
+    terminate_server
+    sleep 1
+    io_filepath = File.expand_path("#{File.dirname(__FILE__)}/io_log_test.log")
+    FileUtils.rm io_filepath, :force => true
+    io = File.open(io_filepath, "a+")
+    run_server(@socket, @max_child_processes, io) {}
+    terminate_server
+    sleep 0.5
+    File.readlines(io_filepath).length.should eql(1)
+    FileUtils.rm io_filepath
   end
 
   it "should flush and reload the log file when it receieves the USR1 signal" do
