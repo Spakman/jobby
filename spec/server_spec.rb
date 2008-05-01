@@ -20,6 +20,7 @@ describe Jobby::Server do
     if File.exists? @child_filepath
       FileUtils.rm @child_filepath
     end
+    FileUtils.rm @log_filepath, :force => true
     sleep 0.5
   end
 
@@ -43,7 +44,7 @@ describe Jobby::Server do
   end
 
   after :all do
-    FileUtils.rm @socket
+    FileUtils.rm @socket, :force => true
   end
 
   it "should listen on a UNIX socket" do
@@ -57,9 +58,6 @@ describe Jobby::Server do
   it "should set the correct permissions on the socket file" do
     `stat --format=%a,%F #{@socket}`.strip.should eql("770,socket")
   end
-
-  it "should set the correct ownership on the socket file"
-  it "should set the correct ownership of the server and children processes"
 
   it "should log when it is started" do
     File.read(@log_filepath).should match(/Server started at/)
@@ -92,8 +90,6 @@ describe Jobby::Server do
     File.read(@child_filepath).should_not eql(@server_pid.to_s)
   end
 
-  it "should actually not make the children wait(!), but queue their requests internally"
-
   it "should only fork off a certain number of children - the others should have to wait (in an internal queue)" do
     terminate_server
     run_server(@socket, @max_child_processes, @log_filepath) do
@@ -112,5 +108,40 @@ describe Jobby::Server do
     File.readlines(@child_filepath).length.should eql(@max_child_processes)
     sleep 4
     File.readlines(@child_filepath).length.should eql(@max_child_processes + 2)
+  end
+
+  it "should receive a flush command from the client and terminate while the children continue processing" do
+    terminate_server
+    sleep 1
+    run_server(@socket, 1, @log_filepath) do
+      sleep 2
+    end
+    2.times do |i|
+      socket = UNIXSocket.open(@socket)
+      socket.send("hiya", 0)
+    end
+    sleep 1
+    socket = UNIXSocket.open(@socket)
+    socket.send("||JOBBY FLUSH||", 0)
+    sleep 1.5
+    lambda { UNIXSocket.open(@socket).send("hello?", 0) }.should raise_error(Errno::ENOENT)
+    `pgrep -f 'ruby.*server_spec.rb' | wc -l`.strip.should eql("2")
+  end
+
+  it "should receive a wipe command from the client and terminate, taking the children with it" do
+    terminate_server
+    run_server(@socket, 1, @log_filepath) do
+      sleep 2
+    end
+    2.times do |i|
+      socket = UNIXSocket.open(@socket)
+      socket.send("hiya", 0)
+    end
+    sleep 1
+    socket = UNIXSocket.open(@socket)
+    socket.send("||JOBBY WIPE||", 0)
+    sleep 2.5
+    lambda { UNIXSocket.open(@socket).send("hello?", 0) }.should raise_error(Errno::ENOENT)
+    `pgrep -f 'ruby.*server_spec.rb'`.strip.should eql("#{Process.pid}")
   end
 end

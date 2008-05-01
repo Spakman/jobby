@@ -1,6 +1,7 @@
 require 'fileutils'
 require 'socket'
 require 'logger'
+require 'thread'
 
 module Jobby
   # This is a generic server class which accepts connections on a UNIX socket. On
@@ -12,6 +13,16 @@ module Jobby
   #     # This code will be run in the forked children
   #     puts "#{Process.pid}: I'm toilet trained!"
   #   end
+  #
+  # ==Stopping the server
+  #
+  # A client process can send one of two special strings to stop the server. 
+  #
+  #   "||JOBBY FLUSH||"   will stop the server forking any more children and shut
+  #                       it down.
+  #
+  #   "||JOBBY WIPE||"    will stop the server forking any more children, kill 9 
+  #                       any existing children and shut it down.
   #
   # ==Log rotation
   #
@@ -30,17 +41,41 @@ module Jobby
       @socket_path = socket_path
       @max_forked_processes = max_forked_processes.to_i
       @log = log
-      @pids = []
+      @queue = Queue.new
     end
 
-    # Starts the server and listens for connections. The specified block is run in the child processes. The message variable that is passed to the block is the message that is received from Client#send.
+    # Starts the server and listens for connections. The specified block is run in 
+    # the child processes. When a connection is received, the input parameter is 
+    # immediately added to the queue.
     def run(&block)
       connect_to_socket_and_start_logging
+      start_forking_thread(block)
       loop do
         client = @socket.accept
         input = client.recvfrom(1024).first
-        # start a new thread to handle the client so we can return quickly
-        Thread.new do
+        if input == "||JOBBY FLUSH||"
+          terminate
+        elsif input == "||JOBBY WIPE||"
+          terminate_children
+          terminate
+        else
+          @queue << input
+        end
+      end
+    end
+
+    protected
+
+    # Runs a thread to manage the forked processes. It will block, waiting for a 
+    # child to finish if the maximum number of forked processes are already 
+    # running. It will then, read from the queue and fork off a new process.
+    #
+    # The input variable that is passed to the block is the message that is 
+    # received from Client#send.
+    def start_forking_thread(block)
+      Thread.new do
+        @pids = []
+        loop do
           if @pids.length >= @max_forked_processes
             begin
               reap_child
@@ -48,17 +83,19 @@ module Jobby
             end
           end
           # fork and run code that performs the actual work
+          input = @queue.pop
           @pids << fork do
+            @logger.info "Child process started (#{Process.pid}"
             block.call(input)
             exit 0
           end
-          reap_child
+          Thread.new do
+            reap_child
+          end
         end
       end
     end
     
-    protected
-
     # Checks if a process is already listening on the socket. If not, removes the 
     # socket file (if it's there) and starts a server. Throws an Errno::EADDRINUSE
     # exception if an existing server is detected.
@@ -102,6 +139,29 @@ module Jobby
       @logger.close
       @logger = Logger.new @log
       @logger.info "USR1 received, rotating log file"
+    end
+
+    # Cleans up the server and exits the process with a return code 0.
+    def terminate
+      @queue.clear
+      @logger.info "Flush received - terminating server"
+      @socket.close
+      FileUtils.rm(@socket_path, :force => true)
+      exit! 0
+    end
+    
+    # Stops any more children being forked and terminates the existing ones. A kill
+    # 9 signal is used as you will likely be run when termination is needed 
+    # immediately, perhaps due to 'runaway' children.
+    def terminate_children
+      @queue.clear
+      @logger.info "Wipe received - terminating forked children"
+      @pids.each do |pid|
+        begin
+          Process.kill 9, pid
+        rescue Errno::ESRCH
+        end
+      end
     end
   end
 end
