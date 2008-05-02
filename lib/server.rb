@@ -49,6 +49,10 @@ module Jobby
     # immediately added to the queue.
     def run(&block)
       connect_to_socket_and_start_logging
+      unless block_given?
+        @logger.error "No block given, exiting"
+        terminate
+      end
       start_forking_thread(block)
       loop do
         client = @socket.accept

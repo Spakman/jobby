@@ -4,65 +4,68 @@ require 'optparse'
 require 'etc'
 require "#{File.dirname(__FILE__)}/../lib/server"
 require "#{File.dirname(__FILE__)}/../lib/client"
+require "#{File.dirname(__FILE__)}/../lib/runner"
 
-def error(message)
-  puts "  ERROR - #{message}"
-  exit -1
-end
+options = {}
+OptionParser.new do |opts|
+  opts.banner = "Usage: jobby [options]"
 
-def message(message)
-  puts "  #{message}"
-end
-
-require "#{File.dirname(__FILE__)}/../lib/options" # this gives an options hash to use
-
-begin
-  # Change ownership if needed
-  if options[:group]
-    message "Setting group ownership to #{options[:group]}..." if options[:verbose]
-    Process::GID.change_privilege Etc.getgrnam(options[:group]).gid
-  end
-  if options[:user]
-    message "Setting user ownership to #{options[:user]}..." if options[:verbose]
-    Process::UID.change_privilege Etc.getpwnam(options[:user]).uid
+  opts.on("-v", "--[no-]verbose", "Run verbosely") do |verbose|
+    options[:verbose] = verbose
   end
 
-  if options[:flush] or options[:wipe]
-    if options[:wipe]
-      message "Stopping Jobby server and terminating forked children..."
-    else
-      message "Stopping Jobby server..."
-    end
+  opts.on("-h", "--help", "Show this message") do
+    puts opts
+    exit
   end
 
-  # Try to connect to the server process
-  message "Trying to connect to server on #{options[:socket]}..." if options[:verbose]
-  Jobby::Client.new(options[:socket]) { |client| client.send(options[:input]) }
-  message "Success!" if options[:verbose]
-rescue Errno::EPERM
-  error "You don't have permission to change the process ownership - perhaps you should be root?"
-rescue Errno::EACCES => exception
-  error exception.message
-rescue Errno::ENOENT, Errno::ECONNREFUSED
-  message "There doesn't seem to be a server listening on #{options[:socket]} - starting one..." if options[:verbose]
-  # Connect failed, fork and start the server process
-  if options[:ruby].nil? and options[:command].nil?
-    error "No server found on #{options[:socket]} and you didn't give --ruby or --command to execute"
+  opts.on("--version", "Show version") do
+    puts "brand spanking!"
+    exit
   end
-  exit if options[:flush] or options[:wipe]
-  fork do
-    begin
-      Jobby::Server.new(options[:socket], options[:max_child_processes], options[:log]).run(&options[:block_to_run])
-    rescue Exception => exception
-      error exception.message
-    end
+
+  opts.on("-s", "--socket [SOCKETFILE]", "Connect to this UNIX socket") do |socket|
+    options[:socket] = socket
   end
-  sleep 2 # give the server time to start
-  message "Trying to connect to server on #{options[:socket]}..." if options[:verbose]
-  begin
-    Jobby::Client.new(options[:socket]) { |client| client.send(options[:input]) }
-    message "Success!" if options[:verbose]
-  rescue Errno::ECONNREFUSED
-    error "Couldn't connect to the server process"
+
+  opts.on("-i", "--input [INPUT]", "Pass this string to the child process (can be used instead of STDIN)") do |input|
+    options[:input] = input
   end
-end
+
+  opts.on("-f", "--flush", "Shutdown the server on the specified socket") do |flush|
+    options[:flush] = flush
+  end
+
+  opts.on("-w", "--wipe", "Shutdown the server and terminate the children on the specified socket immediately") do |wipe|
+    options[:wipe] = wipe
+  end
+
+  opts.separator ""
+  opts.separator "Server options:"
+
+  opts.on("-l", "--log [LOGFILE]", "Log to this file") do |logfile|
+    options[:log] = logfile
+  end
+
+  opts.on("-m", "--max-children [MAXCHILDREN]", "Run MAXCHILDREN forked processes at any one time") do |forked_children|
+    options[:max_child_processes] = forked_children.to_i
+  end
+
+  opts.on("-u", "--user [USER]", "Run the processes as this user (probably requires superuser priviledges)") do |user|
+    options[:user] = user
+  end
+
+  opts.on("-g", "--group [GROUP]", "Run the processes as this group (probably requires superuser priviledges)") do |group|
+    options[:group] = group
+  end
+
+  opts.on("-r", "--ruby [RUBY]", "Run this Ruby code in the forked children") do |ruby|
+    options[:ruby] = ruby
+  end
+
+  opts.on("-c", "--command [COMMAND]", "Run this shell code in the forked children") do |command|
+    options[:command] = command
+  end
+end.parse!
+
+Jobby::Runner.new(options).run

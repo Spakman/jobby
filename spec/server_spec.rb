@@ -10,7 +10,7 @@ describe Jobby::Server do
 
   def run_server(socket, max_child_processes, log_filepath, &block)
     @server_pid = fork do
-      Jobby::Server.new(socket, max_child_processes, log_filepath).run { block.call}
+      Jobby::Server.new(socket, max_child_processes, log_filepath).run(&block)
     end
     sleep 0.2
   end
@@ -81,6 +81,14 @@ describe Jobby::Server do
     Process.kill "USR1", @server_pid
     sleep 0.2
     File.read(@log_filepath).should match(/USR1 received, rotating log file/)
+  end
+
+  it "should not run if a block is not given" do
+    terminate_server
+    sleep 0.5
+    run_server(@socket, @max_child_processes, @log_filepath)
+    sleep 0.5
+    lambda { UNIXSocket.open(@socket).close }.should raise_error
   end
 
   it "should fork off a child and run the specified code when it receives a connection" do
