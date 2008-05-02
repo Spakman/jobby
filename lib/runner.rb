@@ -1,3 +1,19 @@
+# Copyright (C) 2008  Mark Somerville
+#
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Lesser General Public
+# License as published by the Free Software Foundation; either
+# version 2 of the License, or any later version.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+
 module Jobby
   class Runner
     DEFAULT_OPTIONS = {}
@@ -45,8 +61,8 @@ module Jobby
       rescue Errno::EACCES => exception
         return error(exception.message)
       rescue Errno::ENOENT, Errno::ECONNREFUSED
-        message "There doesn't seem to be a server listening on #{@options[:socket]} - starting one..." if @options[:verbose]
         # Connect failed, fork and start the server process
+        message "There doesn't seem to be a server listening on #{@options[:socket]} - starting one..." if @options[:verbose]
         exit if @options[:flush] or @options[:wipe]
         fork do
           begin
