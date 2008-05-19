@@ -72,7 +72,13 @@ module Jobby
       start_forking_thread(block)
       loop do
         client = @socket.accept
-        input = client.recvfrom(1024).first
+        input = ""
+        begin
+          while client.recv_nonblock(128, Socket::MSG_PEEK)
+            input += client.recv_nonblock(128)
+          end
+        rescue Errno::EAGAIN
+        end
         if input == "||JOBBY FLUSH||"
           terminate
         elsif input == "||JOBBY WIPE||"
@@ -81,6 +87,7 @@ module Jobby
         else
           @queue << input
         end
+        client.close
       end
     end
 
@@ -106,7 +113,7 @@ module Jobby
           input = @queue.pop
           @pids << fork do
             $0 = "jobby: child" # set the process name
-            @logger.info "Child process started (#{Process.pid}"
+            @logger.info "Child process started (#{Process.pid})"
             block.call(input)
             exit 0
           end

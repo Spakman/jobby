@@ -90,6 +90,19 @@ describe Jobby::Server do
     sleep 0.5
     lambda { UNIXSocket.open(@socket).close }.should raise_error
   end
+  
+  it "should read all of the provided message" do
+    terminate_server
+    sleep 0.5
+    run_server(@socket, @max_child_processes, @log_filepath) { |input|
+      File.open(@child_filepath, "a+") do |file|
+        file << "#{input}"
+      end
+    }
+    UNIXSocket.open(@socket).send("1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890", 0)
+    sleep 0.5
+    File.read(@child_filepath).should eql("1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890")
+  end
 
   it "should fork off a child and run the specified code when it receives a connection" do
     socket = UNIXSocket.open(@socket)
@@ -108,8 +121,7 @@ describe Jobby::Server do
     end
     (@max_child_processes + 2).times do |i|
       Thread.new do
-        socket = UNIXSocket.open(@socket)
-        socket.send("hiya", 0)
+        UNIXSocket.open(@socket).send("hiya", 0)
       end
     end
     sleep 2.5
@@ -125,12 +137,10 @@ describe Jobby::Server do
       sleep 2
     end
     2.times do |i|
-      socket = UNIXSocket.open(@socket)
-      socket.send("hiya", 0)
+      UNIXSocket.open(@socket).send("hiya", 0)
     end
     sleep 1
-    socket = UNIXSocket.open(@socket)
-    socket.send("||JOBBY FLUSH||", 0)
+    UNIXSocket.open(@socket).send("||JOBBY FLUSH||", 0)
     sleep 1.5
     lambda { UNIXSocket.open(@socket).send("hello?", 0) }.should raise_error(Errno::ENOENT)
     `pgrep -f 'ruby.*server_spec.rb' | wc -l`.strip.should eql("2")
@@ -142,12 +152,10 @@ describe Jobby::Server do
       sleep 2
     end
     2.times do |i|
-      socket = UNIXSocket.open(@socket)
-      socket.send("hiya", 0)
+      UNIXSocket.open(@socket).send("hiya", 0)
     end
     sleep 1
-    socket = UNIXSocket.open(@socket)
-    socket.send("||JOBBY WIPE||", 0)
+    UNIXSocket.open(@socket).send("||JOBBY WIPE||", 0)
     sleep 2.5
     lambda { UNIXSocket.open(@socket).send("hello?", 0) }.should raise_error(Errno::ENOENT)
     `pgrep -f 'ruby.*server_spec.rb'`.strip.should eql("#{Process.pid}")
