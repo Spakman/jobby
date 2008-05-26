@@ -142,13 +142,13 @@ module Jobby
           connect_to_socket
         end
       end
+      start_logging
     end
 
     def connect_to_socket
       @socket = UNIXServer.open(@socket_path)
       FileUtils.chmod 0770, @socket_path
       @socket.listen 10
-      start_logging
     end
 
     def start_logging
