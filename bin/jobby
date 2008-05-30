@@ -38,7 +38,7 @@ OptionParser.new do |opts|
   end
 
   opts.on("--version", "Show version") do
-    puts "brand spanking!"
+    puts "0.1.0"
     exit
   end
 

@@ -73,11 +73,8 @@ module Jobby
       loop do
         client = @socket.accept
         input = ""
-        begin
-          while client.recv_nonblock(128, Socket::MSG_PEEK)
-            input += client.recv_nonblock(128)
-          end
-        rescue Errno::EAGAIN
+        while bytes = client.read(128)
+          input += bytes
         end
         if input == "||JOBBY FLUSH||"
           terminate

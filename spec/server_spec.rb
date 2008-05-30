@@ -1,4 +1,5 @@
 require "#{File.dirname(__FILE__)}/../lib/server"
+require "#{File.dirname(__FILE__)}/../lib/client"
 require 'fileutils'
 
 # Due to the multi-process nature of these specs, there are a bunch of sleep calls
@@ -98,15 +99,14 @@ describe Jobby::Server do
       File.open(@child_filepath, "a+") do |file|
         file << "#{input}"
       end
-    }
-    UNIXSocket.open(@socket).send("1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890", 0)
+    } 
+    Jobby::Client.new(@socket) { |c| c.send("1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890") }
     sleep 0.5
     File.read(@child_filepath).should eql("1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890")
   end
 
   it "should fork off a child and run the specified code when it receives a connection" do
-    socket = UNIXSocket.open(@socket)
-    socket.send("hiya", 0)
+    Jobby::Client.new(@socket) { |c| c.send("hiya") }
     sleep 0.2
     File.read(@child_filepath).should_not eql(@server_pid.to_s)
   end
@@ -121,7 +121,7 @@ describe Jobby::Server do
     end
     (@max_child_processes + 2).times do |i|
       Thread.new do
-        UNIXSocket.open(@socket).send("hiya", 0)
+        Jobby::Client.new(@socket) { |c| c.send("hiya") }
       end
     end
     sleep 2.5
@@ -137,12 +137,12 @@ describe Jobby::Server do
       sleep 2
     end
     2.times do |i|
-      UNIXSocket.open(@socket).send("hiya", 0)
+      Jobby::Client.new(@socket) { |c| c.send("hiya") }
     end
     sleep 1
-    UNIXSocket.open(@socket).send("||JOBBY FLUSH||", 0)
+    Jobby::Client.new(@socket) { |c| c.send("||JOBBY FLUSH||") }
     sleep 1.5
-    lambda { UNIXSocket.open(@socket).send("hello?", 0) }.should raise_error(Errno::ENOENT)
+    lambda { Jobby::Client.new(@socket) { |c| c.send("hello?") } }.should raise_error(Errno::ENOENT)
     `pgrep -f 'ruby.*server_spec.rb' | wc -l`.strip.should eql("2")
   end
 
@@ -152,12 +152,12 @@ describe Jobby::Server do
       sleep 2
     end
     2.times do |i|
-      UNIXSocket.open(@socket).send("hiya", 0)
+      Jobby::Client.new(@socket) { |c| c.send("hiya") }
     end
     sleep 1
-    UNIXSocket.open(@socket).send("||JOBBY WIPE||", 0)
+    Jobby::Client.new(@socket) { |c| c.send("||JOBBY WIPE||") }
     sleep 2.5
-    lambda { UNIXSocket.open(@socket).send("hello?", 0) }.should raise_error(Errno::ENOENT)
+    lambda { Jobby::Client.new(@socket) { |c| c.send("hello?") } }.should raise_error(Errno::ENOENT)
     `pgrep -f 'ruby.*server_spec.rb'`.strip.should eql("#{Process.pid}")
   end
 end
