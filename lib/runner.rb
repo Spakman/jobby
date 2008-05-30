@@ -104,6 +104,7 @@ module Jobby
       elsif @options[:ruby] # can be either some Ruby code or a filepath
         if File.file?(File.expand_path(@options[:ruby]))
           return lambda { |input|
+            ARGV << input
             load File.expand_path(@options[:ruby])
           }
         else
