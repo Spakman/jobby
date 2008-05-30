@@ -1,0 +1,77 @@
+== Jobby
+
+Jobby is a small utility and library for managing running jobs in concurrent
+processes. It was initially developed for offloading long running tasks from
+the websever in Rails applications, but it has proven to be useful in its own
+right and has been extracted to work in a general manner.
+
+
+== Download
+
+* gem install jobby
+* http://github.com/Spakman/jobby/tree/master
+* git clone git://github.com/Spakman/jobby.git
+
+
+== Contact
+
+* Mark Somerville <mailto:mark@scottishclimbs.com>
+* {Rubyforge}[http://jobby.rubyforge.org/]
+
+
+== Usage
+
+Jobby is a single 'binary' script that, can be run from the command line and is
+often used within scripts. You can, of course, also use the Jobby::Server and
+Jobby::Client classes directly in Ruby programs if you like.
+
+This bash script attempts to illustrate some simple, if somewhat contrived,
+usage of processing a directory full of text files (yes, there are better tools
+for this particular example): 
+
+  #!/bin/bash
+  for i in *; do
+    jobby --ruby 'File.rename("#{input}", "#{input}.jobby"' --max-children 4 --input $i
+  done
+
+The above script runs the specified Ruby code on up to four processes in
+parallel. In this case, each file in the current directory will be renamed with
+'.jobby' appended. Standard Ruby string interpolation is used to replace
+'#{input}' with whatever is specified by --input. You may pass a filepath in
+place of a string as the --ruby parameter - in this case the specified file is
+simply loaded (using the Kernel module method 'load') by Ruby.
+
+The above 'jobby' command is equivalent to:
+
+  jobby --command 'mv #{input} #{input}.jobby' --max-children 4 --input $i
+
+The difference is that whatever is in the --command parameter is exec'd by the
+child process rather than interpretted as Ruby code. Again, Ruby string 
+interpolation is used.
+
+It is important to realise that although the --ruby 'File....' parameter is
+passed every time jobby is called in this for loop, it is only actually read
+and used the first time. I'll try to explain why below.
+
+
+== What happens when you run Jobby?
+
+Jobby can be thought of as a self-managing daemon and client program rolled
+into one. The first time you run Jobby, a daemon is started which listens for
+connections on a socket. The daemon will fork every time it receives a
+connection (up to --max-children, further requests are queued) and the forked
+child will run whatever is specified by --ruby or --command.  
+
+The *same* 'jobby' call also runs a client program to connect to the daemon,
+passing --input as a parameter which will be used by the child process.
+Subsequent calls to 'jobby' will use the existing daemon.  
+
+
+== Running multiple Jobby daemons
+
+Since the --ruby and --command parameters are ignored (and the ones used for
+the first 'jobby' call are used), you may wonder how to specify different types
+of jobs to be run. The most straightforward way to do this is to specify a
+different socket for the Jobby daemon, using the --socket option. Then, the 
+'jobby' command will run whatever --ruby or --command is specified for the 
+daemon running on that socket.
