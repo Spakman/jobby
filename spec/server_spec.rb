@@ -1,6 +1,8 @@
 require "#{File.dirname(__FILE__)}/../lib/server"
 require "#{File.dirname(__FILE__)}/../lib/client"
 require 'fileutils'
+$0 = "jobby spec"
+
 
 # Due to the multi-process nature of these specs, there are a bunch of sleep calls
 # around. This is, of course, pretty brittle but I can't think of a better way of 
@@ -143,7 +145,7 @@ describe Jobby::Server do
     Jobby::Client.new(@socket) { |c| c.send("||JOBBY FLUSH||") }
     sleep 1.5
     lambda { Jobby::Client.new(@socket) { |c| c.send("hello?") } }.should raise_error(Errno::ENOENT)
-    `pgrep -f 'ruby.*server_spec.rb' | wc -l`.strip.should eql("2")
+    `pgrep -f 'jobby spec' | wc -l`.strip.should eql("2")
   end
 
   it "should receive a wipe command from the client and terminate, taking the children with it" do
@@ -158,6 +160,6 @@ describe Jobby::Server do
     Jobby::Client.new(@socket) { |c| c.send("||JOBBY WIPE||") }
     sleep 2.5
     lambda { Jobby::Client.new(@socket) { |c| c.send("hello?") } }.should raise_error(Errno::ENOENT)
-    `pgrep -f 'ruby.*server_spec.rb'`.strip.should eql("#{Process.pid}")
+    `pgrep -f 'jobby spec'`.strip.should eql("#{Process.pid}")
   end
 end
