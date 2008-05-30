@@ -2,7 +2,7 @@
 
 Jobby is a small utility and library for managing running jobs in concurrent
 processes. It was initially developed for offloading long running tasks from
-the websever in Rails applications, but it has proven to be useful in its own
+the webserver in Rails applications, but it has proven to be useful in its own
 right and has been extracted to work in a general manner.
 
 
