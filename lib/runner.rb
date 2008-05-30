@@ -114,7 +114,7 @@ module Jobby
 
       elsif @options[:command]
         return lambda { |input|
-          exec("#{@options[:command].gsub('"', '\"')}")
+          exec(eval("\"#{@options[:command].gsub('"', '\"')}\""))
         }
       end
     end
