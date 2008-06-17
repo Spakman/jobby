@@ -103,18 +103,20 @@ module Jobby
 
       elsif @options[:ruby] # can be either some Ruby code or a filepath
         if File.file?(File.expand_path(@options[:ruby]))
-          return lambda { |input|
+          return lambda { |input, logger|
             ARGV << input
-            load File.expand_path(@options[:ruby])
+            # read and eval this rather than Kernel.load so that the code in the
+            # file can use the local variables in this block
+            instance_eval(File.read(File.expand_path(@options[:ruby])))
           }
         else
-          return lambda { |input|
-            eval(@options[:ruby])
+          return lambda { |input, logger|
+            instance_eval(@options[:ruby])
           }
         end
 
       elsif @options[:command]
-        return lambda { |input|
+        return lambda { |input, logger|
           exec(eval("\"#{@options[:command].gsub('"', '\"')}\""))
         }
       end

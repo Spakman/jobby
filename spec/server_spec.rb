@@ -54,6 +54,20 @@ describe Jobby::Server do
     lambda { UNIXSocket.open(@socket).close }.should_not raise_error
   end
 
+  it "should allow the children to log from within the called block" do
+    terminate_server
+    sleep 0.5
+    run_server(@socket, @max_child_processes, @log_filepath) { |input, logger|
+      logger.info "I can log!"
+    }
+    sleep 1
+    client_socket = UNIXSocket.open(@socket)
+    client_socket.send("hiya", 0)
+    client_socket.close
+    sleep 1
+    File.read(@log_filepath).should match(/I can log!/)
+  end
+
   it "should throw an exception if there is already a process listening on the socket" do
     lambda { Jobby::Server.new(@socket, @max_child_processes, @log_filepath).run { true } }.should raise_error(Errno::EADDRINUSE, "Address already in use - it seems like there is already a server listening on #{@socket}")
   end
@@ -97,7 +111,7 @@ describe Jobby::Server do
   it "should read all of the provided message" do
     terminate_server
     sleep 0.5
-    run_server(@socket, @max_child_processes, @log_filepath) { |input|
+    run_server(@socket, @max_child_processes, @log_filepath) { |input, logger|
       File.open(@child_filepath, "a+") do |file|
         file << "#{input}"
       end

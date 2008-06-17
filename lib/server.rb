@@ -111,7 +111,7 @@ module Jobby
           @pids << fork do
             $0 = "jobby: child" # set the process name
             @logger.info "Child process started (#{Process.pid})"
-            block.call(input)
+            block.call(input, @logger)
             exit 0
           end
           Thread.new do

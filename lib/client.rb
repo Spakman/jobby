@@ -27,7 +27,6 @@ module Jobby
       end
     end
     
-    # Sends a message to the socket.
     def send(message = "")
       @socket.send(message, 0)
     end
