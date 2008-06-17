@@ -9,4 +9,10 @@ task :push_all do
   system "git push jobby_github master"
 end
 
+desc "Builds the gem"
+task :build do
+  system "gem build jobby.gemspec"
+  system "mv *.gem pkg/"
+end
+
 task :default => :spec

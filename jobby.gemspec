@@ -2,7 +2,7 @@ require 'rubygems'
 SPEC = Gem::Specification.new do |spec|
   spec.rubyforge_project = "jobby"
   spec.name = "jobby"
-  spec.version = "0.1.0" 
+  spec.version = "0.1.1" 
   spec.author = "Mark Somerville"
   spec.email = "mark@scottishclimbs.com"
   spec.homepage = "http://mark.scottishclimbs.com/"
