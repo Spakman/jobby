@@ -50,11 +50,11 @@ OptionParser.new do |opts|
     options[:input] = input
   end
 
-  opts.on("-f", "--flush", "Shutdown the server on the specified socket") do |flush|
+  opts.on("-f", "--flush", "Shutdown the server on the socket specified by --socket") do |flush|
     options[:flush] = flush
   end
 
-  opts.on("-w", "--wipe", "Shutdown the server and terminate the children on the specified socket immediately") do |wipe|
+  opts.on("-w", "--wipe", "Shutdown the server and terminate the children immediately on the socket specified by --socket") do |wipe|
     options[:wipe] = wipe
   end
 
