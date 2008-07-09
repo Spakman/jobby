@@ -11,9 +11,9 @@ $0 = "jobby spec"
 
 describe Jobby::Server do
 
-  def run_server(socket, max_child_processes, log_filepath, &block)
+  def run_server(socket, max_child_processes, log_filepath, prerun = nil, &block)
     @server_pid = fork do
-      Jobby::Server.new(socket, max_child_processes, log_filepath).run(&block)
+      Jobby::Server.new(socket, max_child_processes, log_filepath, prerun).run(&block)
     end
     sleep 0.2
   end
@@ -175,5 +175,20 @@ describe Jobby::Server do
     sleep 2.5
     lambda { Jobby::Client.new(@socket) { |c| c.send("hello?") } }.should raise_error(Errno::ENOENT)
     `pgrep -f 'jobby spec'`.strip.should eql("#{Process.pid}")
+  end
+
+  it "should be able to run a Ruby file before any forking" do
+    terminate_server
+    run_server(@socket, 1, @log_filepath, Proc.new { |logger| load "spec/file_for_prerunning.rb" }) do
+      sleep 2
+      if defined?(Preran)
+        File.open(@child_filepath, "a+") do |file|
+          file << "preran OK"
+        end
+      end
+    end
+    Jobby::Client.new(@socket) { |c| c.send("hiya") }
+    sleep 3
+    File.read(@child_filepath).should eql("preran OK")
   end
 end

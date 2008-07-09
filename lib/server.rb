@@ -53,11 +53,12 @@ module Jobby
   #   % pkill -USR1 -f jobby
   #
   class Server
-    def initialize(socket_path, max_forked_processes, log)
+    def initialize(socket_path, max_forked_processes, log, prerun = nil)
       @socket_path = socket_path
       @max_forked_processes = max_forked_processes.to_i
       @log = log
       @queue = Queue.new
+      @prerun = prerun
     end
 
     # Starts the server and listens for connections. The specified block is run in 
@@ -68,6 +69,9 @@ module Jobby
       unless block_given?
         @logger.error "No block given, exiting"
         terminate
+      end
+      if @prerun
+        @prerun.call(@logger)
       end
       start_forking_thread(block)
       loop do
@@ -109,7 +113,7 @@ module Jobby
           # fork and run code that performs the actual work
           input = @queue.pop
           @pids << fork do
-            $0 = "jobby: child" # set the process name
+            $0 = $0.sub(/^(.+? )/, '\1(child) ') # add (child) to the process name
             @logger.info "Child process started (#{Process.pid})"
             block.call(input, @logger)
             exit 0

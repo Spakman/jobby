@@ -32,6 +32,14 @@ module Jobby
         message "--input not supplied, reading from STDIN (use ctrl-d to end input)"
         @options[:input] = $stdin.read
       end
+      create_prerun_proc
+    end
+
+    # Makes a Proc that loads the given filepath, passing in the logger object.
+    def create_prerun_proc
+      if @options[:prerun]
+        @options[:prerun_proc] = Proc.new { |logger| load File.expand_path(@options[:prerun]) }
+      end
     end
 
     # Tries to connect a client to the server. If there isn't a server detected on
@@ -66,7 +74,7 @@ module Jobby
         exit if @options[:flush] or @options[:wipe]
         fork do
           begin
-            Jobby::Server.new(@options[:socket], @options[:max_child_processes], @options[:log]).run(&get_proc_from_options)
+            Jobby::Server.new(@options[:socket], @options[:max_child_processes], @options[:log], @options[:prerun_proc]).run(&get_proc_from_options)
           rescue Exception => exception
             return error(exception.message)
           end

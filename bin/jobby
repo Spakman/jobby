@@ -22,7 +22,7 @@ require "#{File.dirname(__FILE__)}/../lib/server"
 require "#{File.dirname(__FILE__)}/../lib/client"
 require "#{File.dirname(__FILE__)}/../lib/runner"
 
-$0 = "jobby" # set the process name
+$0 = "#{$0} #{ARGV.join(" ")}" # set the process name
 
 options = {}
 OptionParser.new do |opts|
@@ -69,11 +69,11 @@ OptionParser.new do |opts|
     options[:max_child_processes] = forked_children.to_i
   end
 
-  opts.on("-u", "--user [USER]", "Run the processes as this user (probably requires superuser priviledges)") do |user|
+  opts.on("-u", "--user [USER]", "Run the processes as this user (probably requires superuser privileges)") do |user|
     options[:user] = user
   end
 
-  opts.on("-g", "--group [GROUP]", "Run the processes as this group (probably requires superuser priviledges)") do |group|
+  opts.on("-g", "--group [GROUP]", "Run the processes as this group (probably requires superuser privileges)") do |group|
     options[:group] = group
   end
 
@@ -83,6 +83,10 @@ OptionParser.new do |opts|
 
   opts.on("-c", "--command [COMMAND]", "Run this shell code in the forked children") do |command|
     options[:command] = command
+  end
+
+  opts.on("-p", "--prerun [FILEPATH]", "Run this Ruby code before forking any children") do |filepath|
+    options[:prerun] = filepath
   end
 end.parse!
 
