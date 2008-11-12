@@ -1,8 +1,6 @@
 require "#{File.dirname(__FILE__)}/../lib/server"
 require "#{File.dirname(__FILE__)}/../lib/client"
 require 'fileutils'
-$0 = "jobby spec"
-
 
 # Due to the multi-process nature of these specs, there are a bunch of sleep calls
 # around. This is, of course, pretty brittle but I can't think of a better way of 
@@ -40,6 +38,7 @@ describe Jobby::Server do
   end
 
   before :each do
+    $0 = "jobby spec"
     run_server(@socket, @max_child_processes, @log_filepath) {
       File.open(@child_filepath, "a+") do |file|
         file << "#{Process.pid}"
@@ -94,7 +93,7 @@ describe Jobby::Server do
     run_server(@socket, @max_child_processes, io) {}
     terminate_server
     sleep 0.5
-    File.readlines(io_filepath).length.should eql(1)
+    File.readlines(io_filepath).length.should eql(4)
     FileUtils.rm io_filepath
   end
 
@@ -102,7 +101,7 @@ describe Jobby::Server do
     FileUtils.rm @log_filepath
     Process.kill "HUP", @server_pid
     sleep 0.2
-    File.read(@log_filepath).should match(/SIGHUP received, rotating log file/)
+    File.read(@log_filepath).should match(/# Logfile created on/)
   end
 
   it "should not run if a block is not given" do
@@ -151,35 +150,23 @@ describe Jobby::Server do
     File.readlines(@child_filepath).length.should eql(@max_child_processes + 2)
   end
 
-  it "should receive a flush command from the client and terminate while the children continue processing" do
+  it "should receive a USR1 signal then stop accepting connections and terminate after reaping all child PIDs" do
     terminate_server
     sleep 1
     run_server(@socket, 1, @log_filepath) do
-      sleep 2
+      sleep 3
     end
     2.times do |i|
       Jobby::Client.new(@socket) { |c| c.send("hiya") }
     end
-    sleep 1
-    Jobby::Client.new(@socket) { |c| c.send("||JOBBY FLUSH||") }
+    sleep 0.5
+    Process.kill "USR1", @server_pid
     sleep 1.5
+    lambda { Jobby::Client.new(@socket) { |c| c.send("hello?") } }.should raise_error(Errno::ECONNREFUSED)
+    sleep 5
     lambda { Jobby::Client.new(@socket) { |c| c.send("hello?") } }.should raise_error(Errno::ENOENT)
     `pgrep -f 'jobby spec' | wc -l`.strip.should eql("2")
-  end
-
-  it "should receive a wipe command from the client and terminate, taking the children with it" do
-    terminate_server
-    run_server(@socket, 1, @log_filepath) do
-      sleep 2
-    end
-    2.times do |i|
-      Jobby::Client.new(@socket) { |c| c.send("hiya") }
-    end
-    sleep 1
-    Jobby::Client.new(@socket) { |c| c.send("||JOBBY WIPE||") }
-    sleep 2.5
-    lambda { Jobby::Client.new(@socket) { |c| c.send("hello?") } }.should raise_error(Errno::ENOENT)
-    `pgrep -f 'jobby spec'`.strip.should eql("#{Process.pid}")
+    `pgrep -f 'jobbyd spec' | wc -l`.strip.should eql("1")
   end
 
   it "should be able to run a Ruby file before any forking" do

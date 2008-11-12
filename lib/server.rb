@@ -32,13 +32,14 @@ module Jobby
   #
   # ==Stopping the server
   #
-  # A client process can send one of two special strings to stop the server. 
+  # There are two built-in ways of stopping the server:
   #
-  #   "||JOBBY FLUSH||"   will stop the server forking any more children and shut
-  #                       it down.
+  #   SIGUSR1    will stop the server accepting any more connections, but it 
+  #              will continue to fork if there are any requests in the queue. 
+  #              It will then wait for the children to exit before terminating.
   #
-  #   "||JOBBY WIPE||"    will stop the server forking any more children, kill 9 
-  #                       any existing children and shut it down.
+  #   SIGTERM    will stop the server forking any more children, kill 9 any 
+  #              existing children and terminate it.
   #
   # ==Log rotation
   #
@@ -55,6 +56,7 @@ module Jobby
   class Server
     # The log parameter can be either a filepath or an IO object.
     def initialize(socket_path, max_forked_processes, log, prerun = nil)
+      $0 = "jobbyd: #{socket_path}" # set the process name
       @log = log.path rescue log
       reopen_standard_streams
       close_fds
@@ -62,6 +64,7 @@ module Jobby
       @socket_path = socket_path
       @max_forked_processes = max_forked_processes.to_i
       @queue = Queue.new
+      setup_signal_handling
       prerun.call(@logger) unless prerun.nil?
     end
 
@@ -82,14 +85,7 @@ module Jobby
           input += bytes
         end
         client.close
-        if input == "||JOBBY FLUSH||"
-          terminate
-        elsif input == "||JOBBY WIPE||"
-          terminate_children
-          terminate
-        else
-          @queue << input
-        end
+        @queue << input
       end
     end
 
@@ -119,6 +115,27 @@ module Jobby
       end
     end
 
+    # Traps SIGHUP, SIGTERM and SIGUSR1 for log rotation, immediate shutdown 
+    # and very pleasant shutdown.
+    def setup_signal_handling
+      Signal.trap("HUP") do
+        @logger.info "HUP signal received"
+        rotate_log
+      end
+      Signal.trap("TERM") do
+        @logger.info "TERM signal received"
+        @socket.close unless @socket.closed?
+        @queue.clear
+        terminate_children
+        terminate
+      end
+      Signal.trap("USR1") do
+        @logger.info "USR1 signal received"
+        wait_for_children_to_return
+        terminate
+      end
+    end
+
     # Runs a thread to manage the forked processes. It will block, waiting for a 
     # child to finish if the maximum number of forked processes are already 
     # running. It will then, read from the queue and fork off a new process.
@@ -138,8 +155,13 @@ module Jobby
           # fork and run code that performs the actual work
           input = @queue.pop
           @pids << fork do
-            @socket.close # inherited from the Jobby::Server
-            $0 = "jobby: child" # set the process name
+            @socket.close unless @socket.closed? # inherited from the Jobby::Server
+            # re-trap TERM to simply exit, since it is inherited from the Jobby::Server
+            Signal.trap("TERM") do
+              @logger.info "Terminating child process #{Process.pid}"
+              exit 0
+            end
+            $0 = "jobby: #{@socket_path}" # set the process name
             @logger.info "Child process started (#{Process.pid})"
             block.call(input, @logger)
             exit 0
@@ -180,9 +202,6 @@ module Jobby
     def start_logging
       @logger = Logger.new @log
       @logger.info "Server started at #{Time.now}"
-      Signal.trap("HUP") do
-        rotate_log
-      end
     end
 
     def reap_child
@@ -190,16 +209,26 @@ module Jobby
     end
 
     def rotate_log
+      @logger.info "Rotating log file"
       @logger.close
       @logger = Logger.new @log
-      @logger.info "SIGHUP received, rotating log file"
+    end
+
+    # Closes the socket and waits for any children to finish before 
+    # terminating. New children that are already in the queue may be 
+    # still be forked at this stage.
+    def wait_for_children_to_return
+      @socket.close
+      while @pids.length > 0
+        sleep 1
+      end
     end
 
     # Cleans up the server and exits the process with a return code 0.
     def terminate
       @queue.clear
-      @logger.info "Flush received - terminating server"
-      @socket.close
+      @logger.info "Terminating server #{Process.pid}"
+      @socket.close unless @socket.closed?
       FileUtils.rm(@socket_path, :force => true)
       exit! 0
     end
@@ -209,10 +238,10 @@ module Jobby
     # immediately, perhaps due to 'runaway' children.
     def terminate_children
       @queue.clear
-      @logger.info "Wipe received - terminating forked children"
+      @logger.info "Terminating forked children"
       @pids.each do |pid|
         begin
-          Process.kill 9, pid
+          Process.kill 15, pid
         rescue Errno::ESRCH
         end
       end

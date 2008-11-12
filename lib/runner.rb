@@ -24,11 +24,7 @@ module Jobby
 
     def initialize(options = {})
       @options = DEFAULT_OPTIONS.merge options
-      if @options[:wipe]
-        @options[:input] = "||JOBBY WIPE||"
-      elsif @options[:flush]
-        @options[:input] = "||JOBBY FLUSH||"
-      elsif @options[:input].nil?
+      if @options[:input].nil?
         message "--input not supplied, reading from STDIN (use ctrl-d to end input)"
         @options[:input] = $stdin.read
       end
@@ -58,20 +54,12 @@ module Jobby
     def run
       change_process_ownership
       begin
-        if @options[:flush] or @options[:wipe]
-          if @options[:wipe]
-            message "Stopping Jobby server and terminating forked children..."
-          else
-            message "Stopping Jobby server..."
-          end
-        end
         run_client
       rescue Errno::EACCES => exception
         return error(exception.message)
       rescue Errno::ENOENT, Errno::ECONNREFUSED
         # Connect failed, fork and start the server process
         message "There doesn't seem to be a server listening on #{@options[:socket]} - starting one..." if @options[:verbose]
-        exit if @options[:flush] or @options[:wipe]
         fork do
           begin
             Jobby::Server.new(@options[:socket], @options[:max_child_processes], @options[:log], @options[:prerun_proc]).run(&get_proc_from_options)
