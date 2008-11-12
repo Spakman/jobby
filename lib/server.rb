@@ -42,36 +42,41 @@ module Jobby
   #
   # ==Log rotation
   #
-  # The server can receive USR1 signals as notification that the logfile has been 
+  # The server can receive SIGHUP as notification that the logfile has been 
   # rotated. This will close and re-open the handle to the log file. Since the
-  # server process forks to produce children, they too can handle USR1 signals on
-  # log rotation.
+  # server process forks to produce children, they too can handle SIGHUP on log 
+  # rotation.
   #
   # To tell all Jobby processes that the log file has been rotated, use something 
   # like:
   # 
-  #   % pkill -USR1 -f jobby
+  #   % pkill -HUP -f jobby
   #
   class Server
+    # The log parameter can be either a filepath or an IO object.
     def initialize(socket_path, max_forked_processes, log, prerun = nil)
+      begin
+        @logpath = log.path
+      rescue NoMethodError
+        @logpath = log
+      end
+      reopen_standard_streams
+      close_fds
+      start_logging
       @socket_path = socket_path
       @max_forked_processes = max_forked_processes.to_i
-      @log = log
       @queue = Queue.new
-      @prerun = prerun
+      prerun.call(@logger) unless prerun.nil?
     end
 
     # Starts the server and listens for connections. The specified block is run in 
     # the child processes. When a connection is received, the input parameter is 
     # immediately added to the queue.
     def run(&block)
-      connect_to_socket_and_start_logging
+      try_to_connect_to_socket
       unless block_given?
         @logger.error "No block given, exiting"
         terminate
-      end
-      if @prerun
-        @prerun.call(@logger)
       end
       start_forking_thread(block)
       loop do
@@ -94,6 +99,24 @@ module Jobby
 
     protected
 
+    # Reopens STDIN (/dev/null), STDOUT and STDERR (both @logpath).
+    def reopen_standard_streams
+      $stdin.reopen("/dev/null", "r")
+      $stdout.reopen(@logpath, "w")
+      $stderr.reopen(@logpath, "w")
+    end
+
+    # This closes all file descriptors for this process except STDIN, STDOUT 
+    # and STDERR. This is because we might have inherited some FDs from the 
+    # calling process, which we don't want.
+    def close_fds
+      Dir.entries("/proc/#{Process.pid}/fd/").each do |file|
+        unless file == '.' or file == '..' or file.to_i < 3
+          IO.new(file.to_i).close rescue nil
+        end
+      end
+    end
+
     # Runs a thread to manage the forked processes. It will block, waiting for a 
     # child to finish if the maximum number of forked processes are already 
     # running. It will then, read from the queue and fork off a new process.
@@ -113,7 +136,8 @@ module Jobby
           # fork and run code that performs the actual work
           input = @queue.pop
           @pids << fork do
-            $0 = $0.sub(/^(.+? )/, '\1(child) ') # add (child) to the process name
+            @socket.close # inherited from the Jobby::Server
+            $0 = "jobby: child" # set the process name
             @logger.info "Child process started (#{Process.pid})"
             block.call(input, @logger)
             exit 0
@@ -128,7 +152,7 @@ module Jobby
     # Checks if a process is already listening on the socket. If not, removes the 
     # socket file (if it's there) and starts a server. Throws an Errno::EADDRINUSE
     # exception if an existing server is detected.
-    def connect_to_socket_and_start_logging
+    def try_to_connect_to_socket
       unless File.exists? @socket_path
         connect_to_socket
       else
@@ -143,7 +167,6 @@ module Jobby
           connect_to_socket
         end
       end
-      start_logging
     end
 
     def connect_to_socket
@@ -153,9 +176,9 @@ module Jobby
     end
 
     def start_logging
-      @logger = Logger.new @log
+      @logger = Logger.new @logpath
       @logger.info "Server started at #{Time.now}"
-      Signal.trap("USR1") do
+      Signal.trap("HUP") do
         rotate_log
       end
     end
@@ -166,8 +189,8 @@ module Jobby
 
     def rotate_log
       @logger.close
-      @logger = Logger.new @log
-      @logger.info "USR1 received, rotating log file"
+      @logger = Logger.new @logpath
+      @logger.info "SIGHUP received, rotating log file"
     end
 
     # Cleans up the server and exits the process with a return code 0.

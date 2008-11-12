@@ -9,6 +9,11 @@ $0 = "jobby spec"
 # handling it. If they start failing 'randomly', I would first start by increasing
 # the sleep times.
 
+class Jobby::Server
+  # Redefining STDIN, STDOUT and STDERR makes testing pretty savage
+  def reopen_standard_streams; end
+end
+
 describe Jobby::Server do
 
   def run_server(socket, max_child_processes, log_filepath, prerun = nil, &block)
@@ -93,11 +98,11 @@ describe Jobby::Server do
     FileUtils.rm io_filepath
   end
 
-  it "should flush and reload the log file when it receieves the USR1 signal" do
+  it "should flush and reload the log file when it receieves the HUP signal" do
     FileUtils.rm @log_filepath
-    Process.kill "USR1", @server_pid
+    Process.kill "HUP", @server_pid
     sleep 0.2
-    File.read(@log_filepath).should match(/USR1 received, rotating log file/)
+    File.read(@log_filepath).should match(/SIGHUP received, rotating log file/)
   end
 
   it "should not run if a block is not given" do
@@ -190,5 +195,15 @@ describe Jobby::Server do
     Jobby::Client.new(@socket) { |c| c.send("hiya") }
     sleep 3
     File.read(@child_filepath).should eql("preran OK")
+  end
+  
+  it "close all file descriptors that might have been inherited from the calling process" do
+    terminate_server
+    f = File.open("spec/file_for_prerunning.rb", "r")
+    run_server(@socket, 1, @log_filepath) do
+      sleep 2
+    end
+    Dir.entries("/proc/#{@server_pid}/fd/").length.should eql(7)
+    f.close
   end
 end
