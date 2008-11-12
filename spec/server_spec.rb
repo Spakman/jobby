@@ -90,7 +90,7 @@ describe Jobby::Server do
     sleep 1
     io_filepath = File.expand_path("#{File.dirname(__FILE__)}/io_log_test.log")
     FileUtils.rm io_filepath, :force => true
-    io = File.open(io_filepath, "a+")
+    io = File.open(io_filepath, "w")
     run_server(@socket, @max_child_processes, io) {}
     terminate_server
     sleep 0.5

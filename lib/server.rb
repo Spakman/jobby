@@ -55,11 +55,7 @@ module Jobby
   class Server
     # The log parameter can be either a filepath or an IO object.
     def initialize(socket_path, max_forked_processes, log, prerun = nil)
-      begin
-        @logpath = log.path
-      rescue NoMethodError
-        @logpath = log
-      end
+      @log = log.path rescue log
       reopen_standard_streams
       close_fds
       start_logging
@@ -85,6 +81,7 @@ module Jobby
         while bytes = client.read(128)
           input += bytes
         end
+        client.close
         if input == "||JOBBY FLUSH||"
           terminate
         elsif input == "||JOBBY WIPE||"
@@ -93,17 +90,22 @@ module Jobby
         else
           @queue << input
         end
-        client.close
       end
     end
 
     protected
 
-    # Reopens STDIN (/dev/null), STDOUT and STDERR (both @logpath).
+    # Reopens STDIN (/dev/null), STDOUT and STDERR (both @log).
     def reopen_standard_streams
       $stdin.reopen("/dev/null", "r")
-      $stdout.reopen(@logpath, "w")
-      $stderr.reopen(@logpath, "w")
+      # @log is either a string or an IO object
+      if @log.respond_to? :close
+        $stdout.reopen(@log)
+        $stderr.reopen(@log)
+      else
+        $stdout.reopen(@log, "w")
+        $stderr.reopen(@log, "w")
+      end
     end
 
     # This closes all file descriptors for this process except STDIN, STDOUT 
@@ -176,7 +178,7 @@ module Jobby
     end
 
     def start_logging
-      @logger = Logger.new @logpath
+      @logger = Logger.new @log
       @logger.info "Server started at #{Time.now}"
       Signal.trap("HUP") do
         rotate_log
@@ -189,7 +191,7 @@ module Jobby
 
     def rotate_log
       @logger.close
-      @logger = Logger.new @logpath
+      @logger = Logger.new @log
       @logger.info "SIGHUP received, rotating log file"
     end
 
