@@ -161,6 +161,7 @@ module Jobby
               @logger.info "Terminating child process #{Process.pid}"
               exit 0
             end
+            Signal.trap("USR1") {}
             $0 = "jobby: #{@socket_path}" # set the process name
             @logger.info "Child process started (#{Process.pid})"
             block.call(input, @logger)
