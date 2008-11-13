@@ -67,11 +67,19 @@ module Jobby
             return error(exception.message)
           end
         end
-        sleep 2 # give the server time to start
-        begin
-          run_client
-        rescue Errno::ECONNREFUSED
-          return error("Couldn't connect to the server process")
+        # give the server 30 seconds to start
+        @connected = false
+        60.times do
+          begin
+            run_client
+            @connected = true
+            break
+          rescue Errno::ECONNREFUSED, Errno::EACCES, Errno::ENOENT
+            sleep 0.5
+          end
+        end
+        unless @connected
+          error "Couldn't connect to the server process after 60 tries"
         end
       end
     end
