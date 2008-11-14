@@ -69,14 +69,19 @@ and used the first time. I'll try to explain why below.
 
 == Log rotation
 
-Issue a HUP signal to tell a Jobby process that the log file has been rotated. You need to do this for all Jobby processes.
+Issue a HUP signal to tell a Jobby process that the log file has been rotated.
+You need to do this for all Jobby processes.
 
 
 == Stopping Jobby
 
-Sending a USR1 signal to the Jobby daemon process (jobbyd) will gracefully shutdown Jobby. The daemon process will stop accepting any more connections and close the socket. It will honour anything in the queue and wait until all the children have exited before exiting itself. In the meantime, you can start another Jobby daemon on the old socket.
+Sending a USR1 signal to the Jobby daemon process (jobbyd) will gracefully
+shutdown Jobby. The daemon process will stop accepting any more connections and
+close the socket. It will honour anything in the queue and wait until all the
+children have exited before exiting itself. In the meantime, you can start
+another Jobby daemon on the old socket.
 
-Sending a TERM signal to the Jobby daemon process (jobbyd) will terminate the related Jobby processes immediately (kill -9 the children, then exit the daemon).
+Sending a TERM signal to the Jobby daemon process (jobbyd) will terminate the related Jobby processes (kill -15 the children, then exit the daemon).
 
 
 == Running multiple Jobby daemons
