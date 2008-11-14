@@ -19,6 +19,19 @@ right and has been extracted to work in a general manner.
 * {Rubyforge}[http://jobby.rubyforge.org/]
 
 
+== What happens when you run Jobby?
+
+Jobby can be thought of as a self-managing daemon and client program rolled
+into one. The first time you run Jobby, a daemon is started which listens for
+connections on a socket. The daemon will fork every time it receives a
+connection (up to --max-children, further requests are queued) and the forked
+child will run whatever is specified by --ruby or --command.  
+
+The *same* 'jobby' call also runs a client program to connect to the daemon,
+passing --input as a parameter which will be used by the child process.
+Subsequent calls to 'jobby' will use the existing daemon.  
+
+
 == Usage
 
 Jobby is a single 'binary' script that, can be run from the command line and is
@@ -54,17 +67,16 @@ passed every time jobby is called in this for loop, it is only actually read
 and used the first time. I'll try to explain why below.
 
 
-== What happens when you run Jobby?
+== Log rotation
 
-Jobby can be thought of as a self-managing daemon and client program rolled
-into one. The first time you run Jobby, a daemon is started which listens for
-connections on a socket. The daemon will fork every time it receives a
-connection (up to --max-children, further requests are queued) and the forked
-child will run whatever is specified by --ruby or --command.  
+Issue a HUP signal to tell a Jobby process that the log file has been rotated. You need to do this for all Jobby processes.
 
-The *same* 'jobby' call also runs a client program to connect to the daemon,
-passing --input as a parameter which will be used by the child process.
-Subsequent calls to 'jobby' will use the existing daemon.  
+
+== Stopping Jobby
+
+Sending a USR1 signal to the Jobby daemon process (jobbyd) will gracefully shutdown Jobby. The daemon process will stop accepting any more connections and close the socket. It will honour anything in the queue and wait until all the children have exited before exiting itself. In the meantime, you can start another Jobby daemon on the old socket.
+
+Sending a TERM signal to the Jobby daemon process (jobbyd) will terminate the related Jobby processes immediately (kill -9 the children, then exit the daemon).
 
 
 == Running multiple Jobby daemons

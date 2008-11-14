@@ -99,8 +99,8 @@ module Jobby
         $stdout.reopen(@log)
         $stderr.reopen(@log)
       else
-        $stdout.reopen(@log, "w")
-        $stderr.reopen(@log, "w")
+        $stdout.reopen(@log, "a+")
+        $stderr.reopen(@log, "a+")
       end
     end
 
@@ -231,7 +231,7 @@ module Jobby
       @logger.info "Terminating server #{Process.pid}"
       @socket.close unless @socket.closed?
       FileUtils.rm(@socket_path, :force => true)
-      exit! 0
+      exit 0
     end
     
     # Stops any more children being forked and terminates the existing ones. A kill
