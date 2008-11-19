@@ -15,8 +15,8 @@ task :build do
     puts "You didn't specify a version number in the environment variable VERSION"
     exit -1
   end
-  FileUtils.cp "jobby.gemspec", "jobby.gemspec.before_substitution"
-  FileUtils.cp "bin/jobby", "jobby.before_substitution"
+  FileUtils.cp "jobby.gemspec", "jobby.gemspec.before_substitution", :preserve => true
+  FileUtils.cp "bin/jobby", "jobby.before_substitution", :preserve => true
   system "sed -i 's/%%%VERSION%%%/#{ENV["VERSION"]}/g' jobby.gemspec bin/jobby"
   system "gem build jobby.gemspec"
   FileUtils.mv "jobby-#{ENV["VERSION"]}.gem", "pkg/"
