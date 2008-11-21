@@ -81,7 +81,8 @@ close the socket. It will honour anything in the queue and wait until all the
 children have exited before exiting itself. In the meantime, you can start
 another Jobby daemon on the old socket.
 
-Sending a TERM signal to the Jobby daemon process (jobbyd) will terminate the related Jobby processes (kill -15 the children, then exit the daemon).
+Sending a TERM signal to the Jobby daemon process (jobbyd) will terminate the
+related Jobby processes (kill -15 the children, then exit the daemon).
 
 
 == Running multiple Jobby daemons

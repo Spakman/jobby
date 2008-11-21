@@ -38,7 +38,7 @@ module Jobby
   #              will continue to fork if there are any requests in the queue. 
   #              It will then wait for the children to exit before terminating.
   #
-  #   SIGTERM    will stop the server forking any more children, kill 9 any 
+  #   SIGTERM    will stop the server forking any more children, kill 15 any 
   #              existing children and terminate it.
   #
   # ==Log rotation
@@ -81,7 +81,7 @@ module Jobby
       loop do
         client = @socket.accept
         input = ""
-        while bytes = client.read(128)
+        while bytes = client.read(1)
           input += bytes
         end
         client.close
