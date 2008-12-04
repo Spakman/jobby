@@ -23,6 +23,9 @@ module Jobby
   # This is a generic server class which accepts connections on a UNIX socket. On
   # receiving a connection, the server process forks and runs the specified block.
   #
+  # By default, this class will enable the copy-on-write code if the interpretter 
+  # supports it.
+  # 
   # ==Example
   #
   #   Jobby::Server.new("/tmp/jobby.socket", 3, "/var/log/jobby.log").run do
@@ -61,6 +64,9 @@ module Jobby
       reopen_standard_streams
       close_fds
       start_logging
+      if GC.respond_to?(:copy_on_write_friendly=)
+        GC.copy_on_write_friendly = true
+      end
       @socket_path = socket_path
       @max_forked_processes = max_forked_processes.to_i
       @queue = Queue.new

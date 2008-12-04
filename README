@@ -93,3 +93,11 @@ of jobs to be run. The most straightforward way to do this is to specify a
 different socket for the Jobby daemon, using the --socket option. Then, the 
 'jobby' command will run whatever --ruby or --command is specified for the 
 daemon running on that socket.
+
+
+== Copy-on-write ==
+
+The Jobby::Server will enable the copy-on-write-friendly code when the
+interpretter supports it. You might not want this, but can disable it by
+passing calling GC.copy_on_write_friendly = true within a file that is
+--prerun.
