@@ -108,7 +108,7 @@ module Jobby
     # and STDERR. This is because we might have inherited some FDs from the 
     # calling process, which we don't want.
     def close_fds
-      Dir.entries("/proc/#{Process.pid}/fd/").each do |file|
+      Dir.entries("/dev/fd/").each do |file|
         unless file == '.' or file == '..' or file.to_i < 3
           IO.new(file.to_i).close rescue nil
         end
