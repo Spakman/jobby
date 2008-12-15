@@ -15,6 +15,9 @@ task :build do
     puts "You didn't specify a version number in the environment variable VERSION"
     exit -1
   end
+  system "find #{File.dirname(__FILE__)} -type d -exec chmod -R 755 {} \;"
+  system "find #{File.dirname(__FILE__)} -type f -exec chmod -R 644 {} \;"
+  system "chmod -R 755 #{File.dirname(__FILE__)}/bin/jobby"
   FileUtils.cp "jobby.gemspec", "jobby.gemspec.before_substitution", :preserve => true
   FileUtils.cp "bin/jobby", "jobby.before_substitution", :preserve => true
   system "sed -i 's/%%%VERSION%%%/#{ENV["VERSION"]}/g' jobby.gemspec bin/jobby"
