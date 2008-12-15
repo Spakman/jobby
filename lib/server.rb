@@ -23,6 +23,9 @@ module Jobby
   # This is a generic server class which accepts connections on a UNIX socket. On
   # receiving a connection, the server process forks and runs the specified block.
   #
+  # By default, this class will enable the copy-on-write code if the interpretter 
+  # supports it.
+  # 
   # ==Example
   #
   #   Jobby::Server.new("/tmp/jobby.socket", 3, "/var/log/jobby.log").run do
@@ -38,7 +41,7 @@ module Jobby
   #              will continue to fork if there are any requests in the queue. 
   #              It will then wait for the children to exit before terminating.
   #
-  #   SIGTERM    will stop the server forking any more children, kill 9 any 
+  #   SIGTERM    will stop the server forking any more children, kill 15 any 
   #              existing children and terminate it.
   #
   # ==Log rotation
@@ -61,6 +64,9 @@ module Jobby
       reopen_standard_streams
       close_fds
       start_logging
+      if GC.respond_to?(:copy_on_write_friendly=)
+        GC.copy_on_write_friendly = true
+      end
       @socket_path = socket_path
       @max_forked_processes = max_forked_processes.to_i
       @queue = Queue.new
@@ -81,7 +87,7 @@ module Jobby
       loop do
         client = @socket.accept
         input = ""
-        while bytes = client.read(128)
+        while bytes = client.read(1)
           input += bytes
         end
         client.close
@@ -99,8 +105,8 @@ module Jobby
         $stdout.reopen(@log)
         $stderr.reopen(@log)
       else
-        $stdout.reopen(@log, "w")
-        $stderr.reopen(@log, "w")
+        $stdout.reopen(@log, "a+")
+        $stderr.reopen(@log, "a+")
       end
     end
 
@@ -231,7 +237,7 @@ module Jobby
       @logger.info "Terminating server #{Process.pid}"
       @socket.close unless @socket.closed?
       FileUtils.rm(@socket_path, :force => true)
-      exit! 0
+      exit 0
     end
     
     # Stops any more children being forked and terminates the existing ones. A kill
