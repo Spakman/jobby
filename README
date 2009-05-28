@@ -19,6 +19,13 @@ right and has been extracted to work in a general manner.
 * {Rubyforge}[http://jobby.rubyforge.org/]
 
 
+== Credits
+
+Although the code was entirely authored by Mark Somerville, it should be noted
+that lots of discussion took place with Andrew Clayton concerning the design
+and development of the software.
+
+
 == What happens when you run Jobby?
 
 Jobby can be thought of as a self-managing daemon and client program rolled

@@ -87,8 +87,8 @@ module Jobby
       loop do
         client = @socket.accept
         input = ""
-        while bytes = client.read(1)
-          input += bytes
+        while byte = client.read(1)
+          input += byte
         end
         client.close
         @queue << input
