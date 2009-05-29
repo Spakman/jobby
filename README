@@ -102,9 +102,19 @@ different socket for the Jobby daemon, using the --socket option. Then, the
 daemon running on that socket.
 
 
-== Copy-on-write ==
+== Copy-on-write
 
 The Jobby::Server will enable the copy-on-write-friendly code when the
 interpretter supports it. You might not want this, but can disable it by
 passing calling GC.copy_on_write_friendly = true within a file that is
 --prerun.
+
+
+== Known problems
+
+When stopping a jobbyd with a USR1 signal, the receiving socket is closed and
+the queue is honoured. This allows another jobbyd to start on the same socket
+(desirable), but the new jobbyd does not know how many jobs are running or are
+in the queue of the old jobbyd. This means that the --max-children for that
+socket will potentially be --max-children of the old jobbyd plus the
+--max-children of the new jobbyd until the old jobs have finished.
