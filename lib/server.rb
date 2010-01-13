@@ -69,6 +69,7 @@ module Jobby
       end
       @socket_path = socket_path
       @max_forked_processes = max_forked_processes.to_i
+      @pids = []
       @queue = Queue.new
       setup_signal_handling
       prerun.call(@logger) unless prerun.nil?
@@ -86,10 +87,7 @@ module Jobby
       start_forking_thread(block)
       loop do
         client = @socket.accept
-        input = ""
-        while bytes = client.read(1)
-          input += bytes
-        end
+        input = client.read
         client.close
         @queue << input
       end
@@ -130,7 +128,7 @@ module Jobby
       end
       Signal.trap("TERM") do
         @logger.info "TERM signal received"
-        @socket.close unless @socket.closed?
+        close_socket
         @queue.clear
         terminate_children
         terminate
@@ -150,7 +148,6 @@ module Jobby
     # received from Client#send.
     def start_forking_thread(block)
       Thread.new do
-        @pids = []
         loop do
           if @pids.length >= @max_forked_processes
             begin
@@ -161,7 +158,7 @@ module Jobby
           # fork and run code that performs the actual work
           input = @queue.pop
           @pids << fork do
-            @socket.close unless @socket.closed? # inherited from the Jobby::Server
+            close_socket # inherited from the Jobby::Server
             # re-trap TERM to simply exit, since it is inherited from the Jobby::Server
             Signal.trap("TERM") do
               @logger.info "Terminating child process #{Process.pid}"
@@ -206,6 +203,12 @@ module Jobby
       @socket.listen 10
     end
 
+    def close_socket
+      if @socket
+        @socket.close unless @socket.closed?
+      end
+    end
+
     def start_logging
       @logger = Logger.new @log
       @logger.info "Server started at #{Time.now}"
@@ -235,7 +238,7 @@ module Jobby
     def terminate
       @queue.clear
       @logger.info "Terminating server #{Process.pid}"
-      @socket.close unless @socket.closed?
+      close_socket
       FileUtils.rm(@socket_path, :force => true)
       exit 0
     end

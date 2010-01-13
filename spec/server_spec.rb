@@ -44,6 +44,7 @@ describe Jobby::Server do
         file << "#{Process.pid}"
       end
     }
+    sleep 0.2
   end
 
   after :each do
@@ -127,7 +128,7 @@ describe Jobby::Server do
 
   it "should fork off a child and run the specified code when it receives a connection" do
     Jobby::Client.new(@socket) { |c| c.send("hiya") }
-    sleep 0.2
+    sleep 0.5
     File.read(@child_filepath).should_not eql(@server_pid.to_s)
   end
 
@@ -179,6 +180,7 @@ describe Jobby::Server do
         end
       end
     end
+    sleep 0.2
     Jobby::Client.new(@socket) { |c| c.send("hiya") }
     sleep 3
     File.read(@child_filepath).should eql("preran OK")
@@ -190,6 +192,7 @@ describe Jobby::Server do
     run_server(@socket, 1, @log_filepath) do
       sleep 2
     end
+    sleep 0.5
     Dir.entries("/proc/#{@server_pid}/fd/").length.should eql(7)
     f.close
   end
