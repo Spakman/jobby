@@ -1,6 +1,6 @@
 desc "Run the specs"
 task :spec do
-  require "spec/run_all.rb"
+  exec "spec spec/run_all.rb"
 end
 
 desc "Pushes to Rubyforge and GitHub"
