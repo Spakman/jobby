@@ -110,11 +110,8 @@ passing calling GC.copy_on_write_friendly = true within a file that is
 --prerun.
 
 
-== Known problems
+== Bugs, comments or feature requsts are encouraged
 
-When stopping a jobbyd with a USR1 signal, the receiving socket is closed and
-the queue is honoured. This allows another jobbyd to start on the same socket
-(desirable), but the new jobbyd does not know how many jobs are running or are
-in the queue of the old jobbyd. This means that the --max-children for that
-socket will potentially be --max-children of the old jobbyd plus the
---max-children of the new jobbyd until the old jobs have finished.
+This is the best place:
+
+{Issue tracker}[http://github.com/Spakman/jobby/issues]
