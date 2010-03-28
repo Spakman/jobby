@@ -14,22 +14,23 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
-require 'fileutils'
-require 'socket'
-require 'logger'
-require 'thread'
+require "fileutils"
+require "socket"
+require "logger"
+require "thread"
 
 module Jobby
-  # This is a generic server class which accepts connections on a UNIX socket. On
-  # receiving a connection, the server process forks and runs the specified block.
+  # This is a generic server class which accepts connections on a Unix domain
+  # socket.  On receiving a connection, the server process forks and runs the
+  # specified block.
   #
-  # By default, this class will enable the copy-on-write code if the interpretter 
-  # supports it.
+  # By default, this class will enable the copy-on-write code if the
+  # interpretter supports it.
   # 
   # ==Example
   #
   #   Jobby::Server.new("/tmp/jobby.socket", 3, "/var/log/jobby.log").run do
-  #     # This code will be run in the forked children
+  #     # this will be run in the forked children processes
   #     puts "#{Process.pid}: I'm toilet trained!"
   #   end
   #
@@ -37,22 +38,22 @@ module Jobby
   #
   # There are two built-in ways of stopping the server:
   #
-  #   SIGUSR1    will stop the server accepting any more connections, but it 
-  #              will continue to fork if there are any requests in the queue. 
+  #   SIGUSR1    will stop the server accepting any more connections, but it
+  #              will continue to fork if there are any requests in the queue.
   #              It will then wait for the children to exit before terminating.
   #
-  #   SIGTERM    will stop the server forking any more children, kill 15 any 
+  #   SIGTERM    will stop the server forking any more children, kill 15 any
   #              existing children and terminate it.
   #
   # ==Log rotation
   #
-  # The server can receive SIGHUP as notification that the logfile has been 
+  # The server can receive SIGHUP as notification that the logfile has been
   # rotated. This will close and re-open the handle to the log file. Since the
-  # server process forks to produce children, they too can handle SIGHUP on log 
+  # server process forks to produce children, they too can handle SIGHUP on log
   # rotation.
   #
-  # To tell all Jobby processes that the log file has been rotated, use something 
-  # like:
+  # To tell all Jobby processes that the log file has been rotated, use
+  # something like, under Linux (at least):
   # 
   #   % pkill -HUP -f jobby
   #
@@ -75,9 +76,9 @@ module Jobby
       prerun.call(@logger) unless prerun.nil?
     end
 
-    # Starts the server and listens for connections. The specified block is run in 
-    # the child processes. When a connection is received, the input parameter is 
-    # immediately added to the queue.
+    # Starts the server and listens for connections. The specified block is run
+    # in the child processes. When a connection is received, the input parameter
+    # is immediately added to the queue.
     def run(&block)
       try_to_connect_to_socket
       unless block_given?
@@ -108,8 +109,8 @@ module Jobby
       end
     end
 
-    # This closes all file descriptors for this process except STDIN, STDOUT 
-    # and STDERR. This is because we might have inherited some FDs from the 
+    # This closes all file descriptors for this process except STDIN, STDOUT
+    # and STDERR. This is because we might have inherited some FDs from the
     # calling process, which we don't want.
     def close_fds
       Dir.entries("/dev/fd/").each do |file|
@@ -119,7 +120,7 @@ module Jobby
       end
     end
 
-    # Traps SIGHUP, SIGTERM and SIGUSR1 for log rotation, immediate shutdown 
+    # Traps SIGHUP, SIGTERM and SIGUSR1 for log rotation, immediate shutdown
     # and very pleasant shutdown.
     def setup_signal_handling
       Signal.trap("HUP") do
@@ -140,11 +141,11 @@ module Jobby
       end
     end
 
-    # Runs a thread to manage the forked processes. It will block, waiting for a 
-    # child to finish if the maximum number of forked processes are already 
+    # Runs a thread to manage the forked processes. It will block, waiting for a
+    # child to finish if the maximum number of forked processes are already
     # running. It will then, read from the queue and fork off a new process.
     #
-    # The input variable that is passed to the block is the message that is 
+    # The input variable that is passed to the block is the message that is
     # received from Client#send.
     def start_forking_thread(block)
       Thread.new do
@@ -159,7 +160,8 @@ module Jobby
           input = @queue.pop
           @pids << fork do
             close_socket # inherited from the Jobby::Server
-            # re-trap TERM to simply exit, since it is inherited from the Jobby::Server
+            # re-trap TERM to simply exit, since it is inherited from the
+            # Jobby::Server
             Signal.trap("TERM") do
               @logger.info "Terminating child process #{Process.pid}"
               exit 0
@@ -177,9 +179,9 @@ module Jobby
       end
     end
     
-    # Checks if a process is already listening on the socket. If not, removes the 
-    # socket file (if it's there) and starts a server. Throws an Errno::EADDRINUSE
-    # exception if an existing server is detected.
+    # Checks if a process is already listening on the socket. If not, removes
+    # the socket file (if it's there) and starts a server. Throws an
+    # Errno::EADDRINUSE exception if an existing server is detected.
     def try_to_connect_to_socket
       unless File.exists? @socket_path
         connect_to_socket
@@ -224,8 +226,8 @@ module Jobby
       @logger = Logger.new @log
     end
 
-    # Closes the socket and waits for any children to finish before 
-    # terminating. New children that are already in the queue may be 
+    # Closes the socket and waits for any children to finish before
+    # terminating. New children that are already in the queue may be
     # still be forked at this stage.
     def wait_for_children_to_return
       @socket.close
@@ -243,9 +245,11 @@ module Jobby
       exit 0
     end
     
-    # Stops any more children being forked and terminates the existing ones. A kill
-    # 9 signal is used as you will likely be run when termination is needed 
+    # Stops any more children being forked and terminates the existing ones. A
+    # kill 9 signal is used as you will likely be run when termination is needed
     # immediately, perhaps due to 'runaway' children.
+    #
+    # FIXME: docmentation says kill 9 is used, but code says kill 15.
     def terminate_children
       @queue.clear
       @logger.info "Terminating forked children"
