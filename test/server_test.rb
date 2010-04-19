@@ -34,8 +34,7 @@ class ServerTest < JobbyTestCase
   end
 
   def test_does_not_run_if_a_block_is_not_given
-    terminate_server
-    wait_for_jobby!
+    terminate_server_and_wait_for_jobby!
     run_server(@socket, @max_child_processes, @log_filepath)
     wait_for_jobby!
     assert_raise Errno::ENOENT do
@@ -43,4 +42,29 @@ class ServerTest < JobbyTestCase
     end
   end
  
+  def test_allows_children_to_log_within_called_block
+    terminate_server_and_wait_for_jobby!
+    run_server(@socket, @max_child_processes, @log_filepath) do |i, logger|
+      logger.info "I can log!"
+    end
+    wait_for_jobby! 1
+    client_socket = UNIXSocket.open(@socket)
+    client_socket.send("hiya", 0)
+    client_socket.close
+    wait_for_jobby! 1
+    assert_match /I can log!/, File.read(@log_filepath)
+  end
+
+  def test_accepts_IO_object_instead_of_a_log_filepath
+    terminate_server_and_wait_for_jobby!
+    io_filepath = File.expand_path("#{File.dirname(__FILE__)}/io_log_test.log")
+    FileUtils.rm io_filepath, :force => true
+    io = File.open(io_filepath, "w")
+    run_server(@socket, @max_child_processes, io) {}
+    terminate_server_and_wait_for_jobby!
+    assert_equal 4, File.readlines(io_filepath).length
+    FileUtils.rm io_filepath
+  end
+
+
 end
