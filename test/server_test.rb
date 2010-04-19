@@ -68,16 +68,15 @@ class ServerTest < JobbyTestCase
  
   def test_should_read_all_of_the_sent_message
     terminate_server_and_wait_for_jobby!
-    run_server(@socket, @max_child_processes, @log_filepath) { |input, logger|
+    message = '1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890'
+    run_server(@socket, @max_child_processes, @log_filepath) do |input, l|
       File.open(@child_filepath, "a+") do |file|
         file << "#{input}"
       end
-    } 
-    Jobby::Client.new(@socket) { |c| c.send("1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890") }
-    sleep 0.5
-    File.read(@child_filepath).should eql("1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890")
+    end
+    Jobby::Client.new(@socket) { |c| c.send(message) }
+    wait_for_jobby!
+    assert_equal message, File.read(@child_filepath)
   end
-
-
 
 end
