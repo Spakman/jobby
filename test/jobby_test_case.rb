@@ -34,6 +34,11 @@ class JobbyTestCase < Test::Unit::TestCase
 
   protected
 
+  def terminate_server_and_wait_for_jobby!
+    terminate_server
+    wait_for_jobby!
+  end
+
   def wait_for_jobby!(time = 0.5)
     sleep time
   end
