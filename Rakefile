@@ -1,6 +1,11 @@
-desc "Run the specs"
+desc "Run the specs (Deprecated - Will run Test::Unit tests instead)"
 task :spec do
-  exec "spec spec/run_all.rb"
+  exec "testrb test/run_all.rb"
+end
+
+desc "Run the tests"
+task :test do
+  exec 'testrb test/run_all.rb'
 end
 
 desc "Pushes to Rubyforge and GitHub"
@@ -27,4 +32,4 @@ task :build do
   FileUtils.mv "jobby.before_substitution", "bin/jobby", :force => true
 end
 
-task :default => :spec
+task :default => :test
