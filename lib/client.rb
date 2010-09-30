@@ -1,6 +1,6 @@
 # Copyright (C) 2008-2010 Mark Somerville <mark@scottishclimbs.com>
-# Released under the Lesser General Public License (LGPL) version 2.
-# See COPYING
+# Released under the Lesser General Public License (LGPL) version 3.
+# See COPYING.
 
 require 'socket'
 
